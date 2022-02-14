@@ -19,18 +19,12 @@ CREATE TABLE IF NOT EXISTS ratings (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NUL
 """
 
 def find_images():
-    def parse_name(name):
-        # find the sub-
-        start = name.find("sub-")
-        # take everything until /
-        end = name.find("/", start)
-        return name[start:end]
     image_path = Path("/opt/images") if os.environ.get("IMAGE_PATH") is None else Path(os.environ.get("IMAGE_PATH"))
     images = []
-    for image in image_path.rglob("*.gif"):
+    for image in image_path.rglob("*.mp4"):
         images.append({
-            "path": str(image),
-            "name": parse_name(str(image)),
+            "mp4Path": str(image),
+            "webmPath": str(image).replace("mp4", "webm")
         })
     return images
 
@@ -62,7 +56,9 @@ def create_app(test_config=None):
         path = request.args.get("path")
         if path is None:
             abort(400)
-        return send_file(path, mimetype='image/gif')
+        if request.args.get("format") == "webm":
+            return send_file(path, mimetype="video/webm")
+        return send_file(path, mimetype='video/mp4')
 
     @app.route(f"{API_PREFIX}/users/list", methods=["GET", "OPTIONS"])
     def list_users():

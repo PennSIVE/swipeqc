@@ -49,7 +49,10 @@ function App() {
         const data = imageData[i];
         cards.push(
           <div key={i} className="card" ref={`card${i}`}>
-            <img src={apiUrl + "/images/get?path=" + encodeURIComponent(data.path)} alt={data.name} />
+            <video autoPlay={true} loop={true} muted={true} playsInline={true} className="w-full">
+                <source src={apiUrl + "/images/get?format=webm&path=" + encodeURIComponent(data.webmPath)} type="video/webm" />
+                <source src={apiUrl + "/images/get?format=mp4&path=" + encodeURIComponent(data.mp4Path)} type="video/mp4" />
+              </video>
           </div>,
         );
       }

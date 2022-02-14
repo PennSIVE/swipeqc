@@ -2,6 +2,15 @@
 
 set -e
 
+# check arguments
+if [ $# -eq 1 ]; then
+    outdir=$PWD
+elif [ $# -eq 2 ]; then
+    outdir=$2
+else
+    echo "Usage: $0 <nifti dir> [<output directory>]"
+fi
+
 cd $1
 flair=flair_ws.nii.gz
 seg=mimosa_binary_mask_0.25.nii.gz
@@ -33,6 +42,14 @@ for i in $(seq 100 $(expr 100 + $(ls $flair_jpg | wc -l) - 1)); do
 done
 
 # convert jpg slices to gif
-gif=$PWD/mimosa.gif
+gif=$tmpdir/mimosa.gif
+mp4=$outdir/mimosa.mp4
+webm=$outdir/mimosa.webm
 convert -delay 0 -loop 0 $overlay_jpg/*.png $gif
+
+# convert gif to mp4 (smaller file size)
+ffmpeg -i $gif -b:v 0 -crf 25 -f mp4 -vcodec libx264 -pix_fmt yuv420p $mp4
+# convert gif to webm (even smaller file size)
+ffmpeg -i $gif -c vp9 -b:v 0 -crf 41 $webm
+
 rm -rf $tmpdir
