@@ -42,14 +42,20 @@ for i in $(seq 100 $(expr 100 + $(ls $flair_jpg | wc -l) - 1)); do
 done
 
 # convert jpg slices to gif
-gif=$tmpdir/mimosa.gif
-mp4=$outdir/mimosa.mp4
-webm=$outdir/mimosa.webm
-convert -delay 0 -loop 0 $overlay_jpg/*.png $gif
+mimosa_gif=$tmpdir/mimosa.gif
+flair_gif=$tmpdir/flair.gif
+# mimosa_mp4=$outdir/mimosa.mp4
+# flair_mp4=$outdir/flair.mp4
+mimosa_webm=$outdir/mimosa.webm
+flair_webm=$outdir/flair.webm
+convert -delay 0 -loop 0 $overlay_jpg/* $mimosa_gif
+convert -delay 0 -loop 0 $flair_jpg/* $flair_gif
 
 # convert gif to mp4 (smaller file size)
-ffmpeg -i $gif -b:v 0 -crf 25 -f mp4 -vcodec libx264 -pix_fmt yuv420p $mp4
+# ffmpeg -i $mimosa_gif -b:v 0 -crf 25 -f mp4 -vcodec libx264 -pix_fmt yuv420p $mimosa_mp4
+# ffmpeg -i $flair_gif -b:v 0 -crf 25 -f mp4 -vcodec libx264 -pix_fmt yuv420p $flair_mp4
 # convert gif to webm (even smaller file size)
-ffmpeg -i $gif -c vp9 -b:v 0 -crf 41 $webm
+ffmpeg -i $mimosa_gif -c vp9 -b:v 0 -crf 41 $mimosa_webm
+ffmpeg -i $flair_gif -c vp9 -b:v 0 -crf 41 $flair_webm
 
 rm -rf $tmpdir
