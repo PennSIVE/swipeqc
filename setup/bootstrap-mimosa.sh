@@ -18,7 +18,8 @@ set -e -u
 
 
 ## Set up the directory that will contain the necessary directories
-PROJECTROOT=${PWD}/mimosa_web
+# PROJECTROOT=${PWD}/mimosa_web
+PROJECTROOT=${PWD}/mimosa_sagt2flairspaces_web
 if [[ -d ${PROJECTROOT} ]]
 then
     echo ${PROJECTROOT} already exists
@@ -43,6 +44,7 @@ then
     # exit 1
 fi
 
+mimosa_script=$(realpath $(dirname $0)/mimosa.sh)
 cd ${PROJECTROOT}
 # Jobs are set up to not require a shared filesystem (except for the lockfile)
 # ------------------------------------------------------------------------------
@@ -68,7 +70,7 @@ datalad install -d . -r --source ${DERIVATIVE_INPUT} inputs/data
 # amend the previous commit with a nicer commit message
 git commit --amend -m 'Register input data dataset as a subdataset'
 
-ZIPS=$(find inputs/data -name 'sub-*' | cut -d '/' -f 3 | sort)
+ZIPS=$(find inputs/data -name 'sub-*' | sort)
 if [ -z "${ZIPS}" ]
 then
     echo "No subjects found in input data"
@@ -139,11 +141,9 @@ unzip_dir=$(basename $ZIP_FILE .zip)
 unzip -d $unzip_dir $ZIP_FILE
 
 # run mimosa in unzip dir
-cp -r xcp_abcd/* .
-
 $(dirname $0)/mimosa.sh $unzip_dir
 EOT
-cp $(dirname $0)/mimosa.sh code/mimosa.sh
+cp $mimosa_script code/mimosa.sh
 
 chmod +x code/*.sh
 
@@ -154,7 +154,6 @@ echo logs >> .gitignore
 datalad save -m "Participant compute job implementation"
 
 # Add a script for merging outputs
-MERGE_POSTSCRIPT=https://raw.githubusercontent.com/PennLINC/TheWay/main/scripts/cubic/merge_outputs_postscript.sh
 cat > code/merge_outputs.sh << "EOT"
 #!/bin/bash
 set -e -u -x
@@ -162,7 +161,69 @@ EOT
 echo "outputsource=${output_store}#$(datalad -f '{infos[dataset][id]}' wtf -S dataset)" \
     >> code/merge_outputs.sh
 echo "cd ${PROJECTROOT}" >> code/merge_outputs.sh
-wget -qO- ${MERGE_POSTSCRIPT} >> code/merge_outputs.sh
+cat >> code/merge_outputs.sh << "EOT"
+datalad clone ${outputsource} merge_ds
+cd merge_ds
+NBRANCHES=$(git branch -a | grep job- | sort | wc -l)
+echo "Found $NBRANCHES branches to merge"
+
+gitref=$(git show-ref master | cut -d ' ' -f1 | head -n 1)
+
+# query all branches for the most recent commit and check if it is identical.
+# Write all branch identifiers for jobs without outputs into a file.
+for i in $(git branch -a | grep job- | sort); do [ x"$(git show-ref $i \
+  | cut -d ' ' -f1)" = x"${gitref}" ] && \
+  echo $i; done | tee code/noresults.txt | wc -l
+
+
+for i in $(git branch -a | grep job- | sort); \
+  do [ x"$(git show-ref $i  \
+     | cut -d ' ' -f1)" != x"${gitref}" ] && \
+     echo $i; \
+done | tee code/has_results.txt
+
+mkdir -p code/merge_batches
+num_branches=$(wc -l < code/has_results.txt)
+CHUNKSIZE=5000
+set +e
+num_chunks=$(expr ${num_branches} / ${CHUNKSIZE})
+if [[ $num_chunks == 0 ]]; then
+    num_chunks=1
+fi
+set -e
+for chunknum in $(seq 1 $num_chunks)
+do
+    startnum=$(expr $(expr ${chunknum} - 1) \* ${CHUNKSIZE} + 1)
+    endnum=$(expr ${chunknum} \* ${CHUNKSIZE})
+    batch_file=code/merge_branches_$(printf %04d ${chunknum}).txt
+    [[ ${num_branches} -lt ${endnum} ]] && endnum=${num_branches}
+    branches=$(sed -n "${startnum},${endnum}p;$(expr ${endnum} + 1)q" code/has_results.txt)
+    echo ${branches} > ${batch_file}
+    git merge -m "merge results batch ${chunknum}/${num_chunks}" $(cat ${batch_file})
+
+done
+
+# Push the merge back
+git push
+
+# Get the file availability info
+git annex fsck --fast -f output-storage
+
+# This should not print anything
+MISSING=$(git annex find --not --in output-storage)
+
+if [[ ! -z "$MISSING" ]]
+then
+    echo Unable to find data for $MISSING
+    exit 1
+fi
+
+# stop tracking this branch
+git annex dead here
+
+datalad push --data nothing
+echo SUCCESS
+EOT
 
 ################################################################################
 # LSF SETUP START - remove or adjust to your needs
@@ -175,8 +236,8 @@ pushgitremote=$(git remote get-url --push output)
 eo_args="-e ${PWD}/logs -o ${PWD}/logs"
 
 for zip in ${ZIPS}; do
-    subject=`echo ${zip} | cut -d '_' -f 1` 
-    echo "bsub ${env_flags} -J UNZIP${subject} ${eo_args} \
+    subject=`echo ${zip} | cut -d '/' -f 5` 
+    echo "bsub -J UNZIP${subject} ${eo_args} \
     ${PWD}/code/participant_job.sh \
     ${dssource} ${pushgitremote} ${subject}" >> code/bsub_calls.sh
 done
