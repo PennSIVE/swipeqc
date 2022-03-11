@@ -17,14 +17,15 @@ schema = """
 CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT UNIQUE);
 CREATE TABLE IF NOT EXISTS ratings (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, uid INTEGER, image TEXT UNIQUE, passed BOOLEAN, at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 """
+static_folder = "/opt/client" if "FRONTEND" not in os.environ else os.environ.get("FRONTEND")
 
 def find_images():
     image_path = Path("/opt/images") if os.environ.get("IMAGE_PATH") is None else Path(os.environ.get("IMAGE_PATH"))
     images = []
-    for image in image_path.rglob("*.mp4"):
+    for image in image_path.rglob("*.webm"):
         images.append({
-            "mp4Path": str(image),
-            "webmPath": str(image).replace("mp4", "webm")
+            "mp4Path": str(image).replace("webm", "mp4"),
+            "webmPath": str(image)
         })
     return images
 
@@ -39,7 +40,10 @@ def create_app(test_config=None):
     conn.commit()
     conn.close()
     images = find_images()
-    app = Flask(__name__, instance_relative_config=True)
+    app = Flask(__name__,
+                static_folder=static_folder + "/static",
+                static_url_path='/static',
+                instance_relative_config=True)
     CORS(app)
     app.config["CORS_HEADERS"] = "no-cors"
 
@@ -96,6 +100,14 @@ def create_app(test_config=None):
         conn.commit()
         conn.close()
         return jsonify({"status": "ok"})
+
+    @app.route('/', defaults={'path': ''})
+    @app.route('/<path>')
+    def serve_root(path):
+        if path != "" and os.path.exists(static_folder + '/' + path):
+            return send_from_directory(static_folder, path)
+        else:
+            return send_from_directory(static_folder, 'index.html')
 
     return app
 
