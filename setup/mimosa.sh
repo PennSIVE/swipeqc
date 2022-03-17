@@ -3,15 +3,13 @@
 set -e
 
 # check arguments
-if [ $# -eq 1 ]; then
-    outdir=$PWD
-elif [ $# -eq 2 ]; then
-    outdir=$2
-else
-    echo "Usage: $0 <nifti dir> [<output directory>]"
+if [ $# -ne 3 ]; then
+    echo "Usage: $0 <nifti dir> <output directory> <sqlite db>"
 fi
 
 cd $1
+outdir=$2
+sqlitedb=$3
 flair=flair_ws.nii.gz
 seg=mimosa_binary_mask_0.25.nii.gz
 tmpdir=$(mktemp -d)
@@ -59,3 +57,11 @@ ffmpeg -i $mimosa_gif -c vp9 -b:v 0 -crf 41 $mimosa_webm
 ffmpeg -i $flair_gif -c vp9 -b:v 0 -crf 41 $flair_webm
 
 rm -rf $tmpdir
+
+# create sqlite db if it doesn't exist
+if [ ! -f $sqlitedb ]; then
+    echo "Creating sqlite db..."
+    sqlite3 $sqlitedb < $(dirname $0)/tables.sql
+fi
+# save to sqlite
+echo "INSERT INTO images (path, mp4, webm) VALUES ('$1', NULL, '$mimosa_webm');" | sqlite3 $sqlitedb

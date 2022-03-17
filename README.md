@@ -12,7 +12,7 @@ dirs=$(find /path/to/mimosa_outputs -name "mimosa_binary_mask_0.25.nii.gz" | xar
 for dir in $dirs; do
     outdir=/path/to/mimosa_web/${dir}
     mkdir -p $outdir
-    qsub singularity run --cleanenv --bind $TMPDIR --bind /path/to/mimosa_web --bind /path/to/mimosa_outputs nifti2video_latest.sif $dir $outdir
+    qsub singularity run --cleanenv --bind $TMPDIR --bind /path/to/mimosa_web --bind /path/to/mimosa_outputs nifti2video_latest.sif $dir $outdir $PWD/db.sqlite
 done
 ```
 

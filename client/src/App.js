@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
+import { useBeforeunload } from 'react-beforeunload';
 import Swing from 'react-swing';
 import axios from 'axios';
 import './App.css';
-const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:43829/api';
+var numCards = 0;
 
 function App() {
   const stackEl = useRef(null);
@@ -10,37 +12,18 @@ function App() {
   const [users, setUsers] = useState([]);
   const [newUserForm, setNewUserForm] = useState(false);
   const [cards, setCards] = useState([]);
-  const [stack, setStack] = useState(null);
-
-  // throwOut Method
-  const throwCard = () => {
-    // React Card Directions
-    // console.log('React.DIRECTION', React.DIRECTION);
-
-    console.log('stack', stack);
-    console.log('stack.getConfig', stack.getConfig());
-    console.log('stackEl', stackEl);
-
-    // React Component Childrens
-    const targetEl = stack.childElements[1];
-    console.log('targetEl', targetEl);
-
-    if (targetEl && targetEl.current) {
-      // stack.getCard
-      const card = stack.getCard(targetEl.current);
-
-      console.log('card', card);
-
-      // throwOut method call
-      // card.throwOut(100, 200, React.DIRECTION.RIGHT);
-    }
-  };
 
   // load cards
-  useEffect(() => {
+  const loadCards = () => {
+    if (!user) {
+      return;
+    }
     axios({
       url: apiUrl + '/images/list',
       method: 'GET',
+      params: {
+        user: user,
+      },
     }).then(res => {
       const imageData = res.data;
       const cards = [];
@@ -49,17 +32,22 @@ function App() {
         const data = imageData[i];
         cards.push(
           <div key={i} className="card" ref={`card${i}`}>
-            <video autoPlay={true} loop={true} muted={true} playsInline={true} className="w-full">
-                <source src={apiUrl + "/images/get?format=webm&path=" + encodeURIComponent(data.webmPath)} type="video/webm" />
-                <source src={apiUrl + "/images/get?format=mp4&path=" + encodeURIComponent(data.mp4Path)} type="video/mp4" />
-              </video>
-          </div>,
+            <video autoPlay={false} loop={true} muted={true} playsInline={true} className="w-full" onLoadedMetadata={e => e.target.currentTime = e.target.duration / 2} onWheel={(e) => {
+              // set video time to current time + deltaY
+              e.target.currentTime += (e.deltaY / 1000) * e.target.duration;
+            }}>
+              <source src={apiUrl + "/images/get?format=webm&path=" + encodeURIComponent(data.webm)} data-id={data.id} type="video/webm" />
+              {/* <source src={apiUrl + "/images/get?format=mp4&path=" + encodeURIComponent(data.mp4)} data-id={data.id} type="video/mp4" /> */}
+            </video>
+          </div>
         );
       }
 
       setCards(cards)
+      numCards = cards.length;
     }).catch(err => console.error(err))
-  }, []);
+  }
+  useEffect(loadCards, [user]);
 
   // load users
   useEffect(() => {
@@ -86,11 +74,27 @@ function App() {
     }
   }, []);
 
+  // clear pending images before page unload
+  useBeforeunload(() => {
+    if (user) {
+      axios({
+        url: `${apiUrl}/users/${user}/clear-pending`,
+        method: 'GET',
+      }).catch(err => console.error(err))
+    }
+  });
+
   const createRating = (image, rating, user) => {
+    numCards = numCards - 1;
+    if (numCards === 0) {
+      // loadCards();
+      // hack: above not working, reload page
+      window.location.reload();
+    }
     const formData = new FormData();
     formData.append('uid', user);
     formData.append('passed', rating);
-    formData.append('image', image.src);
+    formData.append('image', image.dataset.id);
     axios({
       url: apiUrl + '/ratings/create',
       method: 'POST',
@@ -99,12 +103,15 @@ function App() {
         "Content-Type": "multipart/form-data"
       },
     }).then(res => {
-      console.log(res);
+      if (res.status !== 200) {
+        console.error(res)
+      }
     }).catch(err => console.error(err))
   }
   const deleteRating = (image) => {
+    numCards = numCards + 1;
     const formData = new FormData();
-    formData.append('image', image.src);
+    formData.append('image', image.dataset.id);
     axios({
       url: apiUrl + '/ratings/delete',
       method: 'POST',
@@ -113,7 +120,9 @@ function App() {
         "Content-Type": "multipart/form-data"
       },
     }).then(res => {
-      console.log(res);
+      if (res.status !== 200) {
+        console.error(res)
+      }
     }).catch(err => console.error(err))
   }
 
@@ -159,7 +168,6 @@ function App() {
     <div className="App">
       <Swing
         className="stack"
-        setStack={(stack) => setStack(stack)}
         ref={stackEl}
         throwoutleft={(e) => createRating(e.target.children[0], 0, user)}
         throwoutright={(e) => createRating(e.target.children[0], 1, user)}

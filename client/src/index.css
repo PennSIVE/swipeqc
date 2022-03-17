@@ -15,6 +15,8 @@ li {
   padding: 0;
 }
 
+html, body {height: 100%; overflow: hidden}
+
 body {
   background: #FCD424;
   font: normal 16px/24px 'Helvetica Neue', Helvetica, Arial, freesans, sans-serif;
