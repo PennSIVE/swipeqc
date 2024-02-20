@@ -46,6 +46,7 @@ function App() {
                   // set video time to current time + deltaY
                   e.target.currentTime += (e.deltaY / 1000) * e.target.duration;
                 }}
+                data-id={data.id}
               >
                 <source
                   src={
@@ -53,7 +54,6 @@ function App() {
                     "/images/get?format=webm&path=" +
                     encodeURIComponent(data.webm)
                   }
-                  data-id={data.id}
                   type="video/webm"
                 />
                 {/* <source src={apiUrl + "/images/get?format=mp4&path=" + encodeURIComponent(data.mp4)} data-id={data.id} type="video/mp4" /> */}

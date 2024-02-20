@@ -23,11 +23,11 @@ med2image -i ${flair} -d $flair_jpg > /dev/null 2>&1
 med2image -i ${seg} -d $seg_jpg > /dev/null 2>&1
 
 # the first 100 slices are pretty much black
-rm $flair_jpg/output-slice0*
-rm $seg_jpg/output-slice0*
+rm $flair_jpg/output-slice0* || true
+rm $seg_jpg/output-slice0* || true
 # so are the final 50 slices
-rm $flair_jpg/output-slice2*
-rm $seg_jpg/output-slice2*
+rm $flair_jpg/output-slice2* || true
+rm $seg_jpg/output-slice2* || true
 
 for i in $(seq 100 $(expr 100 + $(ls $flair_jpg | wc -l) - 1)); do
     i_pad=$(printf "%03d" $i)
